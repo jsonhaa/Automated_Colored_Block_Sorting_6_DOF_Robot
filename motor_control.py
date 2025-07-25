@@ -4,14 +4,20 @@ import busio
 from adafruit_pca9685 import PCA9685
 from adafruit_motor import servo
 import threading
+
+# Lock to prevent simultaneous servo access from multiple threads
 servo_lock = threading.Lock()
 
-# Setup I2C and PCA9685
+# Setup I2C communication using the board's default SCL and SDA pins
 i2c = busio.I2C(board.SCL, board.SDA)
+
+# Initialize the PCA9685 PWM controller over I2C
 pca = PCA9685(i2c)
+
+# Set the frequency to 50Hz, appropriate for servos
 pca.frequency = 50
 
-# Create Servo objects for each channel
+# Create Servo objects for channels 0–5 with specific pulse width ranges
 servo0 = servo.Servo(pca.channels[0], min_pulse=600, max_pulse=2300)
 servo1 = servo.Servo(pca.channels[1], min_pulse=600, max_pulse=2300)
 servo2 = servo.Servo(pca.channels[2], min_pulse=600, max_pulse=2300)
@@ -19,82 +25,77 @@ servo3 = servo.Servo(pca.channels[3], min_pulse=600, max_pulse=2300)
 servo4 = servo.Servo(pca.channels[4], min_pulse=600, max_pulse=2300)
 servo5 = servo.Servo(pca.channels[5], min_pulse=600, max_pulse=2300)
 
-# From bottom of robot to top:
-# Default/Starting positions: 90, 0, 180, 180, 0, 180
-
+# Function to set the servos to a default "resting" or starting position
 def default_position():
-    # 90 faces forwards, 0 faces left, 180 faces right
+    # Base rotation - 90° points forward
     servo0.angle = 90
-    
-    # 180 turns the arm too forward, set to 125 max
-    # 0 is resting position
-    # Increase bends Forward
-    # Decrease Bends Backwards
+
+    # Shoulder servo - 0° is down/rest, increasing lifts the arm
     servo1.angle = 0
-    
-    # 180 is default/starting position
+
+    # Elbow servo - 180° is default/neutral
     servo2.angle = 180
-    
-    # 0 goes "backwards", 180 is "rest" position
+
+    # Wrist pitch - 180° is neutral
     servo3.angle = 180
-    
-    # 0 is "resting position", 180 is upside down
+
+    # Wrist roll - 0° is resting, 180° would rotate it fully
     servo4.angle = 0
-    
-    # 80 is the farthest without "breaking" the robot, 180 closes the gripper
+
+    # Gripper - 180° is closed, 80° is max open
     servo5.angle = 180
 
-
+# Function to move the robot's arm to a specific bin based on the color
 def identify_bin(s):
     if s == "Red":
         time.sleep(1)
-        servo0.angle = 180
-        servo1.angle = 100
+        servo0.angle = 180       # Rotate base to Red bin
+        servo1.angle = 100       # Lower arm toward bin
         time.sleep(1)
-        servo5.angle = 150
+        servo5.angle = 150       # Release gripper slightly
         time.sleep(1)
     elif s == "Yellow":
         time.sleep(1)
-        servo0.angle = 135
+        servo0.angle = 135       # Rotate to Yellow bin
         servo1.angle = 100
         time.sleep(1)
         servo5.angle = 150
         time.sleep(1)
     elif s == "Green":
         time.sleep(1)
-        servo0.angle = 45
+        servo0.angle = 45        # Rotate to Green bin
         servo1.angle = 100
         time.sleep(1)
         servo5.angle = 150
         time.sleep(1)
     elif s == "Blue":
         time.sleep(1)
-        servo0.angle = 0
+        servo0.angle = 0         # Rotate to Blue bin
         servo1.angle = 100
         time.sleep(1)
         servo5.angle = 150
         time.sleep(1)
 
+# High-level function to perform the entire sorting operation for a given color
 def color_sort(s):
-    # Set default position
     with servo_lock:
+        # Move all servos to default position
         default_position()
         
-        # Give it a bit of time to adjust
+        # Wait to ensure servos reach position
         time.sleep(7)
-        
-        # Grabbing the cube
-        servo5.angle = 150
-        servo1.angle = 130
-        
+
+        # Simulate grabbing a cube
+        servo5.angle = 150       # Start closing gripper slightly
+        servo1.angle = 130       # Lower arm to pick position
         time.sleep(1)
-        
-        servo5.angle = 180
+
+        servo5.angle = 180       # Close gripper to grab the cube
         time.sleep(1)
-        servo1.angle = 0
+        servo1.angle = 0         # Lift arm with cube
         
-        
-        # Determining the color and move cube
+        # Move arm to correct bin and release cube
         identify_bin(s)
-        
+
+        # Return to default position after sorting
         default_position()
